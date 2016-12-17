@@ -23,5 +23,5 @@ Native Unity plugin that lets you asynchronously copy textures and buffers from 
 See Test scene for a simple example. Use only from main thread, it isn't thread-safe.
 
 #Build plugin
-Project files are located in AsyncTextureReader/PluginSource/Projects
-Copy dll to Assets/Plugins folder
+- Project files are located in AsyncTextureReader/PluginSource/Projects
+- Copy dll to Assets/Plugins folder
