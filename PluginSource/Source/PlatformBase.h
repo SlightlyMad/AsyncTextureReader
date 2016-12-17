@@ -61,3 +61,7 @@
 #define SAFE_RELEASE(a) if (a) { a->Release(); a = NULL; }
 #endif
 
+#ifndef SAFE_DELETE
+#define SAFE_DELETE(a) if (a) { delete a; a = NULL; }
+#endif
+

@@ -48,10 +48,10 @@ public:
     virtual void ProcessDeviceEvent(UnityGfxDeviceEventType eventType, IUnityInterfaces* interfaces);
 
     virtual Status RequestTextureData(void* textureHandle);
-    virtual Status RetrieveTextureData(void* textureHandle, void* data);
+    virtual Status RetrieveTextureData(void* textureHandle, void* data, int dataSize);
 
 	virtual Status RequestBufferData(void* bufferHandle);
-	virtual Status RetrieveBufferData(void* bufferHandle, void* data);
+	virtual Status RetrieveBufferData(void* bufferHandle, void* data, int dataSize);
 
 private:
 	void ReleaseResources();

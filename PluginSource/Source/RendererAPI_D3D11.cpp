@@ -111,7 +111,7 @@ Status RendererAPI_D3D11::CreateStagingTexture(ID3D11Texture2D* gpuTexture, ID3D
 
 	// is format supported?
 	if (GetPixelSize(desc.Format) == -1)
-		return Status::UnsupportedFormat;
+		return Status::Error_UnsupportedFormat;
 	
 	desc.Usage = D3D11_USAGE_STAGING;
 	desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -121,7 +121,7 @@ Status RendererAPI_D3D11::CreateStagingTexture(ID3D11Texture2D* gpuTexture, ID3D
 	ID3D11Texture2D* cpuTexture = NULL;
 	if (FAILED(_device->CreateTexture2D(&desc, NULL, &cpuTexture)))
 	{	
-		return Status::Failed;
+		return Status::Error_UnknownError;
 	}
 
 	*stagingTexture = cpuTexture;
@@ -131,20 +131,26 @@ Status RendererAPI_D3D11::CreateStagingTexture(ID3D11Texture2D* gpuTexture, ID3D
 //-------------------------------------------------------------------------------------------------
 // RendererAPI_D3D11::RetrieveTextureData()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::RetrieveTextureData(void* textureHandle, void* data)
+Status RendererAPI_D3D11::RetrieveTextureData(void* textureHandle, void* data, int dataSize)
 {
 	ID3D11Texture2D* gpuTexture = (ID3D11Texture2D*)textureHandle;
 	ID3D11Texture2D* cpuTexture = (ID3D11Texture2D*)_resourceMap[gpuTexture];
 
+	// texture data wasn't requested, there's nothing to retrieve
 	if (cpuTexture == NULL)
-		return Status::Failed;
+		return Status::Error_NoStagingBuffer;
 
 	D3D11_TEXTURE2D_DESC desc;
 	cpuTexture->GetDesc(&desc);
 
 	int pixelSize = GetPixelSize(desc.Format);
 	if (pixelSize == -1)
-		return Status::UnsupportedFormat;
+		return Status::Error_UnsupportedFormat;
+
+	// is supplied buffer big enough?
+	int size = desc.Width * desc.Height * pixelSize;
+	if (size > dataSize)
+		return Status::Error_WrongBufferSize;
 
 	// try to map resource
 	D3D11_MAPPED_SUBRESOURCE resource;
@@ -153,8 +159,8 @@ Status RendererAPI_D3D11::RetrieveTextureData(void* textureHandle, void* data)
 	if (result == DXGI_ERROR_WAS_STILL_DRAWING)
 		return Status::NotReady;
 	// something went wrong
-	if(FAILED(result))
-		return Status::Failed;
+	if (FAILED(result))
+		return Status::Error_UnknownError;
 	
 	// copy line by line to managed memory
 	for (unsigned int row = 0; row < desc.Height; ++row)
@@ -260,7 +266,7 @@ Status RendererAPI_D3D11::CreateStagingBuffer(ID3D11Buffer* gpuBuffer, ID3D11Buf
 	ID3D11Buffer* cpuBuffer = NULL;
 	if (FAILED(_device->CreateBuffer(&desc, NULL, &cpuBuffer)))
 	{
-		return Status::Failed;
+		return Status::Error_UnknownError;
 	}
 
 	*stagingBuffer = cpuBuffer;
@@ -270,16 +276,20 @@ Status RendererAPI_D3D11::CreateStagingBuffer(ID3D11Buffer* gpuBuffer, ID3D11Buf
 //-------------------------------------------------------------------------------------------------
 // RendererAPI_D3D11::RetrieveBufferData()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::RetrieveBufferData(void* bufferHandle, void* data)
+Status RendererAPI_D3D11::RetrieveBufferData(void* bufferHandle, void* data, int dataSize)
 {
 	ID3D11Buffer* gpuBuffer = (ID3D11Buffer*)bufferHandle;
 	ID3D11Buffer* cpuBuffer = (ID3D11Buffer*)_resourceMap[gpuBuffer];
 
+	// texture data wasn't requested, there's nothing to retrieve
 	if (cpuBuffer == NULL)
-		return Status::Failed;
+		return Status::Error_NoStagingBuffer;
 
 	D3D11_BUFFER_DESC desc;
 	cpuBuffer->GetDesc(&desc);
+
+	if (desc.ByteWidth > (unsigned int)dataSize)
+		return Status::Error_WrongBufferSize;
 	
 	D3D11_MAPPED_SUBRESOURCE resource;
 	HRESULT result = _context->Map(cpuBuffer, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &resource);
@@ -287,7 +297,7 @@ Status RendererAPI_D3D11::RetrieveBufferData(void* bufferHandle, void* data)
 	if (result == DXGI_ERROR_WAS_STILL_DRAWING)
 		return Status::NotReady;
 	if (FAILED(result))
-		return Status::Failed;
+		return Status::Error_UnknownError;
 
 	// copy to sys mem
 	memcpy(data, resource.pData, desc.ByteWidth);

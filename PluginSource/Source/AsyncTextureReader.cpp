@@ -80,9 +80,8 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
 
     if (eventType == kUnityGfxDeviceEventShutdown)
-    {
-        assert(sCurrentAPI != NULL);
-        delete sCurrentAPI;
+    {        
+        SAFE_DELETE(sCurrentAPI);
         sDeviceType = kUnityGfxRendererNull;
     }
 }
@@ -92,10 +91,13 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 //-------------------------------------------------------------------------------------------------
 extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestTextureData(void* textureHandle)
 {
+	if (textureHandle == NULL)
+		return (int)Status::Error_InvalidArguments;
+
     if (sCurrentAPI != NULL)
         return (int)sCurrentAPI->RequestTextureData(textureHandle);
     else
-        return (int)Status::UnsupportedAPI;
+        return (int)Status::Error_UnsupportedAPI;
     
 
 }
@@ -103,12 +105,18 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestTextureData(voi
 //-------------------------------------------------------------------------------------------------
 // RetrieveTextureData
 //-------------------------------------------------------------------------------------------------
-extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveTextureData(void* textureHandle, void* data)
+extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveTextureData(void* textureHandle, void* data, int dataSize)
 {
+	// parameters were tested on C# side and can't be invalid
+	assert(data != NULL && dataSize >= 0);
+
+	if (textureHandle == NULL)
+		return (int)Status::Error_InvalidArguments;
+
     if (sCurrentAPI != NULL)
-        return (int)sCurrentAPI->RetrieveTextureData(textureHandle, data);
+        return (int)sCurrentAPI->RetrieveTextureData(textureHandle, data, dataSize);
     else
-        return (int)Status::UnsupportedAPI;
+        return (int)Status::Error_UnsupportedAPI;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -116,10 +124,13 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveTextureData(vo
 //-------------------------------------------------------------------------------------------------
 extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestBufferData(void* bufferHandle)
 {
+	if (bufferHandle == NULL)
+		return (int)Status::Error_InvalidArguments;
+
 	if (sCurrentAPI != NULL)
 		return (int)sCurrentAPI->RequestBufferData(bufferHandle);
 	else
-		return (int)Status::UnsupportedAPI;
+		return (int)Status::Error_UnsupportedAPI;
 
 
 }
@@ -127,12 +138,18 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestBufferData(void
 //-------------------------------------------------------------------------------------------------
 // RetrieveBufferData
 //-------------------------------------------------------------------------------------------------
-extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveBufferData(void* bufferHandle, void* data)
+extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveBufferData(void* bufferHandle, void* data, int dataSize)
 {
+	// parameters were tested on C# side and can't be invalid
+	assert(data != NULL && dataSize >= 0);
+
+	if (bufferHandle == NULL)
+		return (int)Status::Error_InvalidArguments;
+
 	if (sCurrentAPI != NULL)
-		return (int)sCurrentAPI->RetrieveBufferData(bufferHandle, data);
+		return (int)sCurrentAPI->RetrieveBufferData(bufferHandle, data, dataSize);
 	else
-		return (int)Status::UnsupportedAPI;
+		return (int)Status::Error_UnsupportedAPI;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -31,11 +31,14 @@
 
 enum class Status
 {
-    UnsupportedAPI = 0,
-    Succeeded,
+    Succeeded = 0,
     NotReady,
-	Failed,
-	UnsupportedFormat
+	Error_UnsupportedAPI,
+	Error_UnknownError,
+	Error_UnsupportedFormat,
+	Error_WrongBufferSize,
+	Error_NoStagingBuffer,
+	Error_InvalidArguments
 };
 
 typedef void(*FuncPtr)(const char *);
@@ -52,10 +55,10 @@ public:
     virtual void ProcessDeviceEvent(UnityGfxDeviceEventType eventType, IUnityInterfaces* interfaces) = 0;
 
     virtual Status RequestTextureData(void* textureHandle) = 0;
-    virtual Status RetrieveTextureData(void* textureHandle, void* data) = 0;
+    virtual Status RetrieveTextureData(void* textureHandle, void* data, int dataSize) = 0;
 
 	virtual Status RequestBufferData(void* bufferHandle) = 0;
-	virtual Status RetrieveBufferData(void* bufferHandle, void* data) = 0;
+	virtual Status RetrieveBufferData(void* bufferHandle, void* data, int dataSize) = 0;
 };
 
 RendererAPI* CreateRendererAPI(UnityGfxRenderer apiType);
