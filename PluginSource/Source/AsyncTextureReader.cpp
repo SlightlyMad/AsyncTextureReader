@@ -45,6 +45,7 @@ static Status sLastStatus = Status::Succeeded;
 
 // list of resource handles waiting for request
 // maximum of 128 resources can be requested at one time. can't be dynamic and thread safe at the same time. 128 should be big enough
+// still not necessary thread safe !!!
 //std::vector<void*> sResources(128);
 static const int sResourcesSize = 128;
 static void* sResources[sResourcesSize];
@@ -127,7 +128,7 @@ static void UNITY_INTERFACE_API OnRequestTextureEvent(int eventID)
 {
 	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
 	{
-		sCurrentAPI->RequestTextureData(sResources[eventID]);
+		sCurrentAPI->RequestTextureData_RenderThread(sResources[eventID]);
 		// free resource slot for future use
 		sResources[eventID] = NULL;
 	}
@@ -148,7 +149,7 @@ static void UNITY_INTERFACE_API OnRequestBufferEvent(int eventID)
 {
 	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
 	{
-		sCurrentAPI->RequestBufferData(sResources[eventID]);
+		sCurrentAPI->RequestBufferData_RenderThread(sResources[eventID]);
 		// free resource slot for future use
 		sResources[eventID] = NULL;
 	}
@@ -185,7 +186,7 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestTextureData(voi
 
 	if (sCurrentAPI != NULL)
 	{
-		sLastStatus = Status::Succeeded;
+		sLastStatus = sCurrentAPI->RequestTextureData_MainThread(textureHandle);
 		return resourceSlot;
 	}
 	else
@@ -202,7 +203,7 @@ static void UNITY_INTERFACE_API OnCopyTextureEvent(int eventID)
 {
 	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
 	{
-		sCurrentAPI->CopyTextureData(sResources[eventID]);
+		sCurrentAPI->CopyTextureData_RenderThread(sResources[eventID]);
 		// free resource slot for future use
 		sResources[eventID] = NULL;
 	}
@@ -232,7 +233,7 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveTextureData(vo
 
 	if (sCurrentAPI != NULL)
 	{
-		sLastStatus = sCurrentAPI->RetrieveTextureData(textureHandle, data, dataSize);
+		sLastStatus = sCurrentAPI->RetrieveTextureData_MainThread(textureHandle, data, dataSize);
 		if (sLastStatus == Status::NotReady)
 		{
 			int slot = FindFreeResourceSlot();
@@ -268,12 +269,12 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestBufferData(void
 		sLastStatus = Status::Error_TooManyRequests;
 		return -1;
 	}
-
+	
 	sResources[resourceSlot] = bufferHandle;
 
 	if (sCurrentAPI != NULL)
 	{
-		sLastStatus = Status::Succeeded;
+		sLastStatus = sCurrentAPI->RequestBufferData_MainThread(bufferHandle);
 		return resourceSlot;
 	}
 	else
@@ -290,7 +291,7 @@ static void UNITY_INTERFACE_API OnCopyBufferEvent(int eventID)
 {
 	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
 	{
-		sCurrentAPI->CopyBufferData(sResources[eventID]);
+		sCurrentAPI->CopyBufferData_RenderThread(sResources[eventID]);
 		// free resource slot for future use
 		sResources[eventID] = NULL;
 	}
@@ -320,7 +321,7 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveBufferData(voi
 
 	if (sCurrentAPI != NULL)
 	{
-		sLastStatus = sCurrentAPI->RetrieveBufferData(bufferHandle, data, dataSize);
+		sLastStatus = sCurrentAPI->RetrieveBufferData_MainThread(bufferHandle, data, dataSize);
 
 		if (sLastStatus == Status::NotReady)
 		{

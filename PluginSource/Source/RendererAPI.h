@@ -56,13 +56,15 @@ public:
 
     virtual void ProcessDeviceEvent(UnityGfxDeviceEventType eventType, IUnityInterfaces* interfaces) = 0;
 
-    virtual Status RequestTextureData(void* textureHandle) = 0;
-	virtual void CopyTextureData(void* textureHandle) = 0;
-    virtual Status RetrieveTextureData(void* textureHandle, void* data, int dataSize) = 0;
+	virtual Status RequestTextureData_MainThread(void* textureHandle) = 0;
+    virtual Status RequestTextureData_RenderThread(void* textureHandle) = 0;
+	virtual void CopyTextureData_RenderThread(void* textureHandle) = 0;
+    virtual Status RetrieveTextureData_MainThread(void* textureHandle, void* data, int dataSize) = 0;
 
-	virtual Status RequestBufferData(void* bufferHandle) = 0;
-	virtual void CopyBufferData(void* textureHandle) = 0;
-	virtual Status RetrieveBufferData(void* bufferHandle, void* data, int dataSize) = 0;
+	virtual Status RequestBufferData_MainThread(void* bufferHandle) = 0;
+	virtual Status RequestBufferData_RenderThread(void* bufferHandle) = 0;
+	virtual void CopyBufferData_RenderThread(void* textureHandle) = 0;
+	virtual Status RetrieveBufferData_MainThread(void* bufferHandle, void* data, int dataSize) = 0;
 };
 
 RendererAPI* CreateRendererAPI(UnityGfxRenderer apiType);

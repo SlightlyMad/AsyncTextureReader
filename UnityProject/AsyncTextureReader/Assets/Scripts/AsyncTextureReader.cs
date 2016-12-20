@@ -28,6 +28,7 @@
 using UnityEngine;
 using System.Runtime.InteropServices;
 using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// AsyncTextureReader
@@ -108,7 +109,7 @@ public class AsyncTextureReader
         }
         else
         {
-            int requestSlot = RequestTextureData(texture.GetNativeTexturePtr());
+            int requestSlot = RequestTextureData(GetTexturePtr(texture));
             if (requestSlot == -1)
                 status = (Status)GetLastStatus();
             else
@@ -135,7 +136,7 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int slot = RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(int));
+            int slot = RetrieveTextureData(GetTexturePtr(texture), data, data.Length * sizeof(int));
             if (slot != -1)
             {
                 status = Status.NotReady;
@@ -167,7 +168,7 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int slot = RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(float));
+            int slot = RetrieveTextureData(GetTexturePtr(texture), data, data.Length * sizeof(float));
             if (slot != -1)
             {
                 status = Status.NotReady;
@@ -199,7 +200,7 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int slot = RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(byte));
+            int slot = RetrieveTextureData(GetTexturePtr(texture), data, data.Length * sizeof(byte));
             if(slot != -1)
             {
                 status = Status.NotReady;
@@ -231,7 +232,7 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int requestSlot = RequestBufferData(buffer.GetNativeBufferPtr());
+            int requestSlot = RequestBufferData(GetBufferPtr(buffer));
             if (requestSlot == -1)
                 status = (Status)GetLastStatus();
             else
@@ -258,11 +259,11 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int slot = RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(int));
+            int slot = RetrieveBufferData(GetBufferPtr(buffer), data, data.Length * sizeof(int));
             if (slot != -1)
             {
                 status = Status.NotReady;
-                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+                GL.IssuePluginEvent(GetCopyBufferEventFunc(), slot);
             }
             else
             {
@@ -290,11 +291,11 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int slot = RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(float));
+            int slot = RetrieveBufferData(GetBufferPtr(buffer), data, data.Length * sizeof(float));
             if (slot != -1)
             {
                 status = Status.NotReady;
-                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+                GL.IssuePluginEvent(GetCopyBufferEventFunc(), slot);
             }
             else
             {
@@ -322,7 +323,7 @@ public class AsyncTextureReader
             status = Status.Error_InvalidArguments;
         else
         {
-            int slot = RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(byte));
+            int slot = RetrieveBufferData(GetBufferPtr(buffer), data, data.Length * sizeof(byte));
             if (slot != -1)
             {
                 status = Status.NotReady;
@@ -339,7 +340,18 @@ public class AsyncTextureReader
             Debug.LogError("RetrieveBufferData failed: " + status);
 #endif // UNITY_EDITOR
         return status;
-    }    
+    }
+
+    private static IntPtr GetBufferPtr(ComputeBuffer buffer)
+    {
+        IntPtr ptr;
+        if (_bufferHandles.TryGetValue(buffer, out ptr))
+            return ptr;
+
+        ptr = buffer.GetNativeBufferPtr();
+        _bufferHandles.Add(buffer, ptr);
+        return ptr;
+    }
 #endif // UNITY_5_5_OR_NEWER
 
     /// <summary>
@@ -360,6 +372,20 @@ public class AsyncTextureReader
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void MyDelegate(string str);
+
+    private static IntPtr GetTexturePtr(Texture texture)
+    {
+        IntPtr ptr;
+        if (_textureHandles.TryGetValue(texture, out ptr))
+            return ptr;
+
+        ptr = texture.GetNativeTexturePtr();
+        _textureHandles.Add(texture, ptr);
+        return ptr;
+    }
+
+    private static Dictionary<Texture, IntPtr> _textureHandles = new Dictionary<Texture, IntPtr>();
+    private static Dictionary<ComputeBuffer, IntPtr> _bufferHandles = new Dictionary<ComputeBuffer, IntPtr>();
 
     #region DllImport
     [DllImport("AsyncTextureReader")]

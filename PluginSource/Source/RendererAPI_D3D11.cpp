@@ -85,20 +85,43 @@ void RendererAPI_D3D11::ReleaseResources()
 }
 
 //-------------------------------------------------------------------------------------------------
-// RendererAPI_D3D11::RequestTextureData()
+// RendererAPI_D3D11::RequestTextureData_MainThread()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::RequestTextureData(void* textureHandle)
+Status RendererAPI_D3D11::RequestTextureData_MainThread(void* textureHandle)
 {
+	// executed on main thread 
+	// prepare for render thread request that will come later
 	ID3D11Texture2D* texture = (ID3D11Texture2D*)textureHandle;
 
 	CpuResource* cpuResource = _resourceMap[texture];
 	if (cpuResource == NULL)
+	{
+		cpuResource = new CpuResource();
+
+		// not thread safe!
+		_resourceMap[texture] = cpuResource;
+	}
+
+	cpuResource->lastStatus = Status::NotReady;
+	cpuResource->bufferStatus = CpuResourceStatus::WaitingForGpu;
+
+	return Status::Succeeded;
+}
+
+//-------------------------------------------------------------------------------------------------
+// RendererAPI_D3D11::RequestTextureData_RenderThread()
+//-------------------------------------------------------------------------------------------------
+Status RendererAPI_D3D11::RequestTextureData_RenderThread(void* textureHandle)
+{
+	ID3D11Texture2D* texture = (ID3D11Texture2D*)textureHandle;
+
+	CpuResource* cpuResource = _resourceMap[texture];
+	if (cpuResource->stagingBuffer == NULL)
 	{		
 		// create cpu texture
-		Status status = CreateStagingTexture(texture, &cpuResource);
+		Status status = CreateStagingTexture(texture, cpuResource);
 		if (status != Status::Succeeded)
 			return status;
-		_resourceMap[texture] = cpuResource;
 	}
 
 	// not sure about this
@@ -117,7 +140,7 @@ Status RendererAPI_D3D11::RequestTextureData(void* textureHandle)
 //-------------------------------------------------------------------------------------------------
 // RendererAPI_D3D11::CreateStagingTexture()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuResource** cpuResource)
+Status RendererAPI_D3D11::CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuResource* cpuResource)
 {
 	D3D11_TEXTURE2D_DESC desc;
 	gpuTexture->GetDesc(&desc);
@@ -140,21 +163,17 @@ Status RendererAPI_D3D11::CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuR
 		return Status::Error_UnknownError;
 	}
 
-	CpuResource* resource = new CpuResource();
-	resource->stagingBuffer = cpuTexture;
-	resource->bufferStatus = CpuResourceStatus::Ready;
-	resource->bufferSize = size;
-	resource->cpuBuffer = new byte[size];
-
-	*cpuResource = resource;
+	cpuResource->stagingBuffer = cpuTexture;
+	cpuResource->bufferSize = size;
+	cpuResource->cpuBuffer = new byte[size];
 	
 	return Status::Succeeded;
 }
 
 //-------------------------------------------------------------------------------------------------
-// RendererAPI_D3D11::CopyTextureData()
+// RendererAPI_D3D11::CopyTextureData_RenderThread()
 //-------------------------------------------------------------------------------------------------
-void RendererAPI_D3D11::CopyTextureData(void* textureHandle)
+void RendererAPI_D3D11::CopyTextureData_RenderThread(void* textureHandle)
 {
 	ID3D11Texture2D* gpuTexture = (ID3D11Texture2D*)textureHandle;
 	CpuResource* cpuResource = _resourceMap[gpuTexture];
@@ -208,9 +227,9 @@ void RendererAPI_D3D11::CopyTextureData(void* textureHandle)
 }
 
 //-------------------------------------------------------------------------------------------------
-// RendererAPI_D3D11::RetrieveTextureData()
+// RendererAPI_D3D11::RetrieveTextureData_MainThread()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::RetrieveTextureData(void* textureHandle, void* data, int dataSize)
+Status RendererAPI_D3D11::RetrieveTextureData_MainThread(void* textureHandle, void* data, int dataSize)
 {
 	ID3D11Texture2D* gpuTexture = (ID3D11Texture2D*)textureHandle;
 	CpuResource* cpuResource = _resourceMap[gpuTexture];
@@ -289,26 +308,49 @@ int RendererAPI_D3D11::GetPixelSize(DXGI_FORMAT format)
 }
 
 //-------------------------------------------------------------------------------------------------
-// RendererAPI_D3D11::RequestBufferData()
+// RendererAPI_D3D11::RequestBufferData_MainThread()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::RequestBufferData(void* bufferHandle)
+Status RendererAPI_D3D11::RequestBufferData_MainThread(void* bufferHandle)
 {
+	// executed on main thread 
+	// prepare for render thread request that will come later
 	ID3D11Buffer* buffer = (ID3D11Buffer*)bufferHandle;
 
 	CpuResource* cpuResource = _resourceMap[buffer];
 	if (cpuResource == NULL)
 	{
+		cpuResource = new CpuResource();	
+
+		// not thread safe, will have to do for now...
+		_resourceMap[buffer] = cpuResource;
+	}
+
+	cpuResource->bufferStatus = CpuResourceStatus::WaitingForGpu;
+	cpuResource->lastStatus = Status::NotReady;
+
+	return Status::Succeeded;
+}
+
+//-------------------------------------------------------------------------------------------------
+// RendererAPI_D3D11::RequestBufferData_RenderThread()
+//-------------------------------------------------------------------------------------------------
+Status RendererAPI_D3D11::RequestBufferData_RenderThread(void* bufferHandle)
+{
+	ID3D11Buffer* buffer = (ID3D11Buffer*)bufferHandle;
+
+	CpuResource* cpuResource = _resourceMap[buffer];
+	if (cpuResource->stagingBuffer == NULL)
+	{
 		// create cpu buffer
-		Status status = CreateStagingBuffer(buffer, &cpuResource);
+		Status status = CreateStagingBuffer(buffer, cpuResource);
 		if (status != Status::Succeeded)
 			return status;
-		_resourceMap[buffer] = cpuResource;
 	}
 
 	// not sure about this
 	// copy is already in progress
 	//if (cpuResource->bufferStatus != CpuResourceStatus::Ready)
-		//return Status::Error_CopyInProgress;
+	//return Status::Error_CopyInProgress;
 
 	// request buffer copy to cpu memory
 	cpuResource->bufferStatus = CpuResourceStatus::WaitingForGpu;
@@ -321,7 +363,7 @@ Status RendererAPI_D3D11::RequestBufferData(void* bufferHandle)
 //-------------------------------------------------------------------------------------------------
 // RendererAPI_D3D11::CreateStagingBuffer()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::CreateStagingBuffer(ID3D11Buffer* gpuBuffer, CpuResource** cpuResource)
+Status RendererAPI_D3D11::CreateStagingBuffer(ID3D11Buffer* gpuBuffer, CpuResource* cpuResource)
 {
 	D3D11_BUFFER_DESC desc;
 	gpuBuffer->GetDesc(&desc);
@@ -338,21 +380,17 @@ Status RendererAPI_D3D11::CreateStagingBuffer(ID3D11Buffer* gpuBuffer, CpuResour
 	}
 
 	int size = desc.ByteWidth;
-
-	CpuResource* resource = new CpuResource();
-	resource->stagingBuffer = cpuBuffer;
-	resource->bufferStatus = CpuResourceStatus::Ready;
-	resource->bufferSize = size;
-	resource->cpuBuffer = new byte[size];
-
-	*cpuResource = resource;
+		
+	cpuResource->stagingBuffer = cpuBuffer;
+	cpuResource->bufferSize = size;
+	cpuResource->cpuBuffer = new byte[size];
 	return Status::Succeeded;
 }
 
 //-------------------------------------------------------------------------------------------------
-// RendererAPI_D3D11::CopyBufferData()
+// RendererAPI_D3D11::CopyBufferData_RenderThread()
 //-------------------------------------------------------------------------------------------------
-void RendererAPI_D3D11::CopyBufferData(void* bufferHandle)
+void RendererAPI_D3D11::CopyBufferData_RenderThread(void* bufferHandle)
 {
 	ID3D11Buffer* gpuBuffer = (ID3D11Buffer*)bufferHandle;
 	CpuResource* cpuResource = _resourceMap[gpuBuffer];
@@ -389,9 +427,9 @@ void RendererAPI_D3D11::CopyBufferData(void* bufferHandle)
 }
 
 //-------------------------------------------------------------------------------------------------
-// RendererAPI_D3D11::RetrieveBufferData()
+// RendererAPI_D3D11::RetrieveBufferData_MainThread()
 //-------------------------------------------------------------------------------------------------
-Status RendererAPI_D3D11::RetrieveBufferData(void* bufferHandle, void* data, int dataSize)
+Status RendererAPI_D3D11::RetrieveBufferData_MainThread(void* bufferHandle, void* data, int dataSize)
 {
 	ID3D11Buffer* gpuBuffer = (ID3D11Buffer*)bufferHandle;
 	CpuResource* cpuResource = _resourceMap[gpuBuffer];

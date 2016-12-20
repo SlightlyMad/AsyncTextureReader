@@ -69,18 +69,20 @@ public:
 
     virtual void ProcessDeviceEvent(UnityGfxDeviceEventType eventType, IUnityInterfaces* interfaces);
 
-    virtual Status RequestTextureData(void* textureHandle);
-	virtual void CopyTextureData(void* textureHandle);
-    virtual Status RetrieveTextureData(void* textureHandle, void* data, int dataSize);
+	virtual Status RequestTextureData_MainThread(void* textureHandle);
+    virtual Status RequestTextureData_RenderThread(void* textureHandle);
+	virtual void CopyTextureData_RenderThread(void* textureHandle);
+    virtual Status RetrieveTextureData_MainThread(void* textureHandle, void* data, int dataSize);
 
-	virtual Status RequestBufferData(void* bufferHandle);
-	virtual void CopyBufferData(void* textureHandle);
-	virtual Status RetrieveBufferData(void* bufferHandle, void* data, int dataSize);
+	virtual Status RequestBufferData_MainThread(void* bufferHandle);
+	virtual Status RequestBufferData_RenderThread(void* bufferHandle);
+	virtual void CopyBufferData_RenderThread(void* textureHandle);
+	virtual Status RetrieveBufferData_MainThread(void* bufferHandle, void* data, int dataSize);
 
 private:
 	void ReleaseResources();
-	Status CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuResource** cpuResource);
-	Status CreateStagingBuffer(ID3D11Buffer* gpuTexture, CpuResource** cpuResource);
+	Status CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuResource* cpuResource);
+	Status CreateStagingBuffer(ID3D11Buffer* gpuTexture, CpuResource* cpuResource);
 	int GetPixelSize(DXGI_FORMAT format);
 
 private:
