@@ -29,12 +29,34 @@
 
 #include "RendererAPI.h"
 #include "PlatformBase.h"
+#include <atomic>
 
 #if SUPPORT_D3D11
 
 #include <d3d11.h>
 #include <map>
 #include "Unity/IUnityGraphicsD3D11.h"
+
+enum class CpuResourceStatus
+{
+	Ready,
+	WaitingForGpu,
+	CopyFinished
+};
+
+//-------------------------------------------------------------------------------------------------
+// CpuResource
+//-------------------------------------------------------------------------------------------------
+struct CpuResource
+{
+	ID3D11Resource* stagingBuffer;
+	void* cpuBuffer;
+	int bufferSize;
+	std::atomic<CpuResourceStatus> bufferStatus;
+	std::atomic<Status> lastStatus;
+
+	CpuResource() : stagingBuffer(NULL), cpuBuffer(NULL), bufferSize(0), bufferStatus(CpuResourceStatus::Ready) {}
+};
 
 //-------------------------------------------------------------------------------------------------
 // RendererAPI_D3D11
@@ -48,20 +70,22 @@ public:
     virtual void ProcessDeviceEvent(UnityGfxDeviceEventType eventType, IUnityInterfaces* interfaces);
 
     virtual Status RequestTextureData(void* textureHandle);
+	virtual void CopyTextureData(void* textureHandle);
     virtual Status RetrieveTextureData(void* textureHandle, void* data, int dataSize);
 
 	virtual Status RequestBufferData(void* bufferHandle);
+	virtual void CopyBufferData(void* textureHandle);
 	virtual Status RetrieveBufferData(void* bufferHandle, void* data, int dataSize);
 
 private:
 	void ReleaseResources();
-	Status CreateStagingTexture(ID3D11Texture2D* gpuTexture, ID3D11Texture2D** stagingTexture);
-	Status CreateStagingBuffer(ID3D11Buffer* gpuTexture, ID3D11Buffer** stagingTexture);
+	Status CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuResource** cpuResource);
+	Status CreateStagingBuffer(ID3D11Buffer* gpuTexture, CpuResource** cpuResource);
 	int GetPixelSize(DXGI_FORMAT format);
 
 private:
 	// std::map<gpu resource, cpu resource>
-	typedef std::map<ID3D11Resource*, ID3D11Resource*> ResourceMap;
+	typedef std::map<ID3D11Resource*, CpuResource*> ResourceMap;
 	typedef ResourceMap::iterator TextureMapIter;
 
     ID3D11Device* _device;

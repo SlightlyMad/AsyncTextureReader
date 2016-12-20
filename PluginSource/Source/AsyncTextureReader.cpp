@@ -31,6 +31,8 @@
 #include "RendererAPI.h"
 
 #include "assert.h"
+#include <vector>
+#include <atomic>
 
 static IUnityInterfaces* sUnityInterfaces;
 static IUnityGraphics* sUnityGraphics;
@@ -38,6 +40,14 @@ static UnityGfxRenderer sDeviceType = kUnityGfxRendererNull;
 static RendererAPI* sCurrentAPI = NULL;
 
 FuncPtr DebugLog;
+
+static Status sLastStatus = Status::Succeeded;
+
+// list of resource handles waiting for request
+// maximum of 128 resources can be requested at one time. can't be dynamic and thread safe at the same time. 128 should be big enough
+//std::vector<void*> sResources(128);
+static const int sResourcesSize = 128;
+static void* sResources[sResourcesSize];
 
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
 
@@ -72,6 +82,12 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         assert(sCurrentAPI == NULL);
         sDeviceType = sUnityGraphics->GetRenderer();
         sCurrentAPI = CreateRendererAPI(sDeviceType);
+
+		// clear resources array
+		for (int i = 0; i < sResourcesSize; ++i)
+		{
+			sResources[i] = NULL;
+		}
     }
 
     if (sCurrentAPI != NULL)
@@ -87,19 +103,117 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 }
 
 //-------------------------------------------------------------------------------------------------
+// FindFreeResourceSlot
+//-------------------------------------------------------------------------------------------------
+int FindFreeResourceSlot()
+{
+	for (int i = 0; i < sResourcesSize; ++i)
+	{
+		if (sResources[i] == NULL)
+			return i;
+	}
+
+	return -1;
+
+	// can't resize vector. it isn't thread safe
+	//sResources.push_back(NULL);
+	//return sResources.size() - 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+// OnRequestTextureEvent
+//-------------------------------------------------------------------------------------------------
+static void UNITY_INTERFACE_API OnRequestTextureEvent(int eventID)
+{
+	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
+	{
+		sCurrentAPI->RequestTextureData(sResources[eventID]);
+		// free resource slot for future use
+		sResources[eventID] = NULL;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// GetRequestTextureEventFunc
+//-------------------------------------------------------------------------------------------------
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRequestTextureEventFunc()
+{
+	return OnRequestTextureEvent;
+}
+
+//-------------------------------------------------------------------------------------------------
+// OnRequestBufferEvent
+//-------------------------------------------------------------------------------------------------
+static void UNITY_INTERFACE_API OnRequestBufferEvent(int eventID)
+{
+	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
+	{
+		sCurrentAPI->RequestBufferData(sResources[eventID]);
+		// free resource slot for future use
+		sResources[eventID] = NULL;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// GetRequestBufferEventFunc
+//-------------------------------------------------------------------------------------------------
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRequestBufferEventFunc()
+{
+	return OnRequestBufferEvent;
+}
+
+//-------------------------------------------------------------------------------------------------
 // RequestTextureData
 //-------------------------------------------------------------------------------------------------
 extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestTextureData(void* textureHandle)
 {
 	if (textureHandle == NULL)
-		return (int)Status::Error_InvalidArguments;
+	{
+		sLastStatus = Status::Error_InvalidArguments;
+		return -1;
+	}
 
-    if (sCurrentAPI != NULL)
-        return (int)sCurrentAPI->RequestTextureData(textureHandle);
-    else
-        return (int)Status::Error_UnsupportedAPI;
-    
+	// store resource handle
+	int resourceSlot = FindFreeResourceSlot();
+	if (resourceSlot == -1)
+	{
+		sLastStatus = Status::Error_TooManyRequests;
+		return -1;
+	}
 
+	sResources[resourceSlot] = textureHandle;
+
+	if (sCurrentAPI != NULL)
+	{
+		sLastStatus = Status::Succeeded;
+		return resourceSlot;
+	}
+	else
+	{
+		sLastStatus = Status::Error_UnsupportedAPI;
+		return -1;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// OnCopyTextureEvent
+//-------------------------------------------------------------------------------------------------
+static void UNITY_INTERFACE_API OnCopyTextureEvent(int eventID)
+{
+	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
+	{
+		sCurrentAPI->CopyTextureData(sResources[eventID]);
+		// free resource slot for future use
+		sResources[eventID] = NULL;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// GetCopyTextureEventFunc
+//-------------------------------------------------------------------------------------------------
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetCopyTextureEventFunc()
+{
+	return OnCopyTextureEvent;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -111,12 +225,29 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveTextureData(vo
 	assert(data != NULL && dataSize >= 0);
 
 	if (textureHandle == NULL)
-		return (int)Status::Error_InvalidArguments;
+	{
+		sLastStatus = Status::Error_InvalidArguments;
+		return -1;
+	}
 
-    if (sCurrentAPI != NULL)
-        return (int)sCurrentAPI->RetrieveTextureData(textureHandle, data, dataSize);
-    else
-        return (int)Status::Error_UnsupportedAPI;
+	if (sCurrentAPI != NULL)
+	{
+		sLastStatus = sCurrentAPI->RetrieveTextureData(textureHandle, data, dataSize);
+		if (sLastStatus == Status::NotReady)
+		{
+			int slot = FindFreeResourceSlot();
+			// save texture for issue plugin event call
+			sResources[slot] = textureHandle;
+			return slot;
+		}
+
+		return -1;
+	}
+	else
+	{
+		sLastStatus = Status::Error_UnsupportedAPI;
+		return -1;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -125,14 +256,52 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveTextureData(vo
 extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestBufferData(void* bufferHandle)
 {
 	if (bufferHandle == NULL)
-		return (int)Status::Error_InvalidArguments;
+	{
+		sLastStatus = Status::Error_InvalidArguments;
+		return -1;
+	}
+
+	// store resource handle
+	int resourceSlot = FindFreeResourceSlot();
+	if (resourceSlot == -1)
+	{
+		sLastStatus = Status::Error_TooManyRequests;
+		return -1;
+	}
+
+	sResources[resourceSlot] = bufferHandle;
 
 	if (sCurrentAPI != NULL)
-		return (int)sCurrentAPI->RequestBufferData(bufferHandle);
+	{
+		sLastStatus = Status::Succeeded;
+		return resourceSlot;
+	}
 	else
-		return (int)Status::Error_UnsupportedAPI;
+	{
+		sLastStatus = Status::Error_UnsupportedAPI;
+		return -1;
+	}
+}
 
+//-------------------------------------------------------------------------------------------------
+// OnCopyBufferEvent
+//-------------------------------------------------------------------------------------------------
+static void UNITY_INTERFACE_API OnCopyBufferEvent(int eventID)
+{
+	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
+	{
+		sCurrentAPI->CopyBufferData(sResources[eventID]);
+		// free resource slot for future use
+		sResources[eventID] = NULL;
+	}
+}
 
+//-------------------------------------------------------------------------------------------------
+// GetCopyBufferEventFunc
+//-------------------------------------------------------------------------------------------------
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetCopyBufferEventFunc()
+{
+	return OnCopyBufferEvent;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -144,12 +313,38 @@ extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RetrieveBufferData(voi
 	assert(data != NULL && dataSize >= 0);
 
 	if (bufferHandle == NULL)
-		return (int)Status::Error_InvalidArguments;
+	{
+		sLastStatus = Status::Error_InvalidArguments;
+		return -1;
+	}
 
 	if (sCurrentAPI != NULL)
-		return (int)sCurrentAPI->RetrieveBufferData(bufferHandle, data, dataSize);
+	{
+		sLastStatus = sCurrentAPI->RetrieveBufferData(bufferHandle, data, dataSize);
+
+		if (sLastStatus == Status::NotReady)
+		{
+			int slot = FindFreeResourceSlot();
+			// save texture for issue plugin event call
+			sResources[slot] = bufferHandle;
+			return slot;
+		}
+
+		return -1;
+	}
 	else
-		return (int)Status::Error_UnsupportedAPI;
+	{
+		sLastStatus = Status::Error_UnsupportedAPI;
+		return -1;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// GetLastStatus
+//-------------------------------------------------------------------------------------------------
+extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetLastStatus()
+{
+	return (int)sLastStatus;
 }
 
 //-------------------------------------------------------------------------------------------------

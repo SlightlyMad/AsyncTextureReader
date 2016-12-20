@@ -66,11 +66,19 @@ public class AsyncTextureReader
         /// <summary>
         /// Staging (temp) buffer/texture doesn't exist. Are you trying to retrieve data without requesting them first?
         /// </summary>
-        Error_NoStagingBuffer,
+        Error_NoRequest,
         /// <summary>
         /// Invalid arguments.
         /// </summary>
-        Error_InvalidArguments
+        Error_InvalidArguments,
+        /// <summary>
+        /// Too many simultaneous requests
+        /// </summary>
+        Error_TooManyRequests,
+        /// <summary>
+        /// Can't request, copy operation is already in progress
+        /// </summary>
+        Error_CopyInProgress
     }    
 
     /// <summary>
@@ -93,11 +101,19 @@ public class AsyncTextureReader
     /// <returns></returns>
     public static Status RequestTextureData(Texture texture)
     {
-        Status status;
+        Status status = Status.Succeeded;
         if (texture == null)
+        {
             status = Status.Error_InvalidArguments;
+        }
         else
-            status = (Status)RequestTextureData(texture.GetNativeTexturePtr());
+        {
+            int requestSlot = RequestTextureData(texture.GetNativeTexturePtr());
+            if (requestSlot == -1)
+                status = (Status)GetLastStatus();
+            else
+                GL.IssuePluginEvent(GetRequestTextureEventFunc(), requestSlot);
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if(Failed(status))
@@ -118,7 +134,18 @@ public class AsyncTextureReader
         if (texture == null || data == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(int));
+        {
+            int slot = RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(int));
+            if (slot != -1)
+            {
+                status = Status.NotReady;
+                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+            }
+            else
+            {
+                status = (Status)GetLastStatus();
+            }
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -139,7 +166,18 @@ public class AsyncTextureReader
         if (texture == null || data == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(float));
+        {
+            int slot = RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(float));
+            if (slot != -1)
+            {
+                status = Status.NotReady;
+                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+            }
+            else
+            {
+                status = (Status)GetLastStatus();
+            }
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -160,7 +198,18 @@ public class AsyncTextureReader
         if (texture == null || data == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(byte));
+        {
+            int slot = RetrieveTextureData(texture.GetNativeTexturePtr(), data, data.Length * sizeof(byte));
+            if(slot != -1)
+            {
+                status = Status.NotReady;
+                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+            }
+            else
+            {
+                status = (Status)GetLastStatus();
+            }
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -177,11 +226,17 @@ public class AsyncTextureReader
     /// <returns></returns>
     public static Status RequestBufferData(ComputeBuffer buffer)
     {
-        Status status;
+        Status status = Status.Succeeded;
         if (buffer == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RequestBufferData(buffer.GetNativeBufferPtr());
+        {
+            int requestSlot = RequestBufferData(buffer.GetNativeBufferPtr());
+            if (requestSlot == -1)
+                status = (Status)GetLastStatus();
+            else
+                GL.IssuePluginEvent(GetRequestBufferEventFunc(), requestSlot);
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -202,7 +257,18 @@ public class AsyncTextureReader
         if (buffer == null || data == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(int));
+        {
+            int slot = RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(int));
+            if (slot != -1)
+            {
+                status = Status.NotReady;
+                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+            }
+            else
+            {
+                status = (Status)GetLastStatus();
+            }
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -223,7 +289,18 @@ public class AsyncTextureReader
         if (buffer == null || data == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(float));
+        {
+            int slot = RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(float));
+            if (slot != -1)
+            {
+                status = Status.NotReady;
+                GL.IssuePluginEvent(GetCopyTextureEventFunc(), slot);
+            }
+            else
+            {
+                status = (Status)GetLastStatus();
+            }
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -244,7 +321,18 @@ public class AsyncTextureReader
         if (buffer == null || data == null)
             status = Status.Error_InvalidArguments;
         else
-            status = (Status)RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(byte));
+        {
+            int slot = RetrieveBufferData(buffer.GetNativeBufferPtr(), data, data.Length * sizeof(byte));
+            if (slot != -1)
+            {
+                status = Status.NotReady;
+                GL.IssuePluginEvent(GetCopyBufferEventFunc(), slot);
+            }
+            else
+            {
+                status = (Status)GetLastStatus();
+            }
+        }
 
 #if UNITY_EDITOR // check for errors in editor
         if (Failed(status))
@@ -291,6 +379,18 @@ public class AsyncTextureReader
     private static extern int RetrieveBufferData(IntPtr bufferHandle, float[] data, int dataSize);
     [DllImport("AsyncTextureReader")]
     private static extern int RetrieveBufferData(IntPtr bufferHandle, byte[] data, int dataSize);
+
+    [DllImport("AsyncTextureReader")]
+    private static extern IntPtr GetRequestTextureEventFunc();
+    [DllImport("AsyncTextureReader")]
+    private static extern IntPtr GetRequestBufferEventFunc();
+    [DllImport("AsyncTextureReader")]
+    private static extern IntPtr GetCopyTextureEventFunc();
+    [DllImport("AsyncTextureReader")]
+    private static extern IntPtr GetCopyBufferEventFunc();
+
+    [DllImport("AsyncTextureReader")]
+    private static extern int GetLastStatus();
 
     [DllImport("AsyncTextureReader")]
     private static extern int SetDebugFunction(IntPtr functionPointer);

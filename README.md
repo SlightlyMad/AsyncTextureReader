@@ -25,3 +25,6 @@ See Test scene for a simple example. Use only from main thread, it isn't thread-
 #Build plugin
 - Project files are located in AsyncTextureReader/PluginSource/Projects
 - Copy dll to Assets/Plugins folder
+
+#Unity Forum
+You can discusse it [here](https://forum.unity3d.com/threads/asynchronously-getting-data-from-the-gpu-directx-11-with-rendertexture-or-computebuffer.281346/)
