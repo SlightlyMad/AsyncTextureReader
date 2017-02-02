@@ -41,7 +41,7 @@ This should explain why calling AsyncTextureReader.RetrieveTextureData multiple 
 - Copy dll to Assets/Plugins folder
 
 #Unity Forum
-You can discusse it [here](https://forum.unity3d.com/threads/asynchronously-getting-data-from-the-gpu-directx-11-with-rendertexture-or-computebuffer.281346/)
+You can discuss it [here](https://forum.unity3d.com/threads/asynchronously-getting-data-from-the-gpu-directx-11-with-rendertexture-or-computebuffer.281346/)
 
 #Native plugin implementation details
 ## Code organization
@@ -53,6 +53,13 @@ You can discusse it [here](https://forum.unity3d.com/threads/asynchronously-gett
 - `RendererAPI_D3D11.cpp` - implementation of RendererAPI for DirectX11. 
 
 ## How to port it to other platforms
-Coming soon
+1. Implement RendererAPI interface for target platform. See RendererAPI_D3D11 for example implementation.
+2. Add your implementation to CreateRendererAPI function in RendererAPI.cpp file.
 
-
+### RendererAPI interface
+List of functions and what they should do. Only texture related function are listed here. Compute buffer related functions work the same way. Note that the interface was created for DirectX and it isn't necessarily good fit for every rendering API.
+- `ProcessDeviceEvent` - Plugin initialization and cleanup. For example, DirectX device and context is retrieved here and all resources created by the plugin are released here.
+- `RequestTextureData_MainThread` - Called immediately when user code calls `AsyncTextureReader.RequestTextureData`, before `RequestTextureData_RenderThread` is called on render thread. DirectX implementation uses it to initialize some helper data.
+- `RequestTextureData_RenderThread` - Request on render thread. This is where the texture copy takes place.
+- `CopyTextureData_RenderThread` - Called on render thread everytime user code calls `AsyncTextureReader.RetrieveTextureData`. DX version checks if texture copy is finished, it then copies texture data to a buffer that is accessible from main thread and flags texture copy as finished.
+- `RetrieveTextureData_MainThread` -  Called on main thread when user code calls `AsyncTextureReader.RetrieveTextureData`. It should copies texture data to managed buffer supplied by user code if texture copy is finished on render thread.
