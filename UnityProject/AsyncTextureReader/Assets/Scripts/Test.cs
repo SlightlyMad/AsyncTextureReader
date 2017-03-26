@@ -41,6 +41,7 @@ public class Test : MonoBehaviour
             // print RGBA of first pixel
             Debug.LogFormat("Pixel RGBA: {0}; {1}; {2}; {3}", Pixels[0], Pixels[1], Pixels[2], Pixels[3]);
             Pixels = null;
+            AsyncTextureReader.ReleaseTempResources(DebugTexture);
         }        
     }
 
@@ -56,6 +57,7 @@ public class Test : MonoBehaviour
         {
             Debug.LogFormat("Buffer Data: {0}; {1}; {2}; {3}", _floats[0], _floats[1], _floats[2], _floats[3]);
             _floats = null;
+            AsyncTextureReader.ReleaseTempResources(_buffer);
         }
 #endif
     }

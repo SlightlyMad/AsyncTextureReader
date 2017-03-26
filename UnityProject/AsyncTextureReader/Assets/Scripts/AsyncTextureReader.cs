@@ -94,7 +94,35 @@ public class AsyncTextureReader
         else
             return true;
     }
-    
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="texture"></param>
+    /// <returns></returns>
+    public static Status ReleaseTempResources(Texture texture)
+    {
+        Status status = Status.Succeeded;
+        if (texture == null)
+        {
+            status = Status.Error_InvalidArguments;
+        }
+        else
+        {
+            int requestSlot = ReleaseTempResources(GetTexturePtr(texture));
+            if (requestSlot == -1)
+                status = (Status)GetLastStatus();
+            else
+                GL.IssuePluginEvent(GetReleaseTempResourcesEventFunc(), requestSlot);
+        }
+
+#if UNITY_EDITOR // check for errors in editor
+        if (Failed(status))
+            Debug.LogError("RequestTextureData failed: " + status);
+#endif // UNITY_EDITOR
+        return status;
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -220,6 +248,34 @@ public class AsyncTextureReader
     }
 
 #if UNITY_5_5_OR_NEWER
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="texture"></param>
+    /// <returns></returns>
+    public static Status ReleaseTempResources(ComputeBuffer buffer)
+    {
+        Status status = Status.Succeeded;
+        if (buffer == null)
+        {
+            status = Status.Error_InvalidArguments;
+        }
+        else
+        {
+            int requestSlot = ReleaseTempResources(GetBufferPtr(buffer));
+            if (requestSlot == -1)
+                status = (Status)GetLastStatus();
+            else
+                GL.IssuePluginEvent(GetReleaseTempResourcesEventFunc(), requestSlot);
+        }
+
+#if UNITY_EDITOR // check for errors in editor
+        if (Failed(status))
+            Debug.LogError("RequestTextureData failed: " + status);
+#endif // UNITY_EDITOR
+        return status;
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -389,6 +445,8 @@ public class AsyncTextureReader
 
     #region DllImport
     [DllImport("AsyncTextureReader")]
+    private static extern int ReleaseTempResources(IntPtr resourceHandle);
+    [DllImport("AsyncTextureReader")]
     private static extern int RequestTextureData(IntPtr textureHandle);
     [DllImport("AsyncTextureReader")]
     private static extern int RetrieveTextureData(IntPtr textureHandle, int[] data, int dataSize);
@@ -406,6 +464,8 @@ public class AsyncTextureReader
     [DllImport("AsyncTextureReader")]
     private static extern int RetrieveBufferData(IntPtr bufferHandle, byte[] data, int dataSize);
 
+    [DllImport("AsyncTextureReader")]
+    private static extern IntPtr GetReleaseTempResourcesEventFunc();
     [DllImport("AsyncTextureReader")]
     private static extern IntPtr GetRequestTextureEventFunc();
     [DllImport("AsyncTextureReader")]

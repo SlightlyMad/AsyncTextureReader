@@ -65,6 +65,8 @@ public:
 	virtual Status RequestBufferData_RenderThread(void* bufferHandle) = 0;
 	virtual void CopyBufferData_RenderThread(void* textureHandle) = 0;
 	virtual Status RetrieveBufferData_MainThread(void* bufferHandle, void* data, int dataSize) = 0;
+
+	virtual void ReleaseTempResources(void* resourceHandle) = 0;
 };
 
 RendererAPI* CreateRendererAPI(UnityGfxRenderer apiType);

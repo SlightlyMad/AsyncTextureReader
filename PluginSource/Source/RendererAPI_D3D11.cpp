@@ -74,14 +74,41 @@ void RendererAPI_D3D11::ReleaseResources()
 	for (TextureMapIter iter = _resourceMap.begin(); iter != _resourceMap.end(); ++iter)
 	{
 		CpuResource* resource = iter->second;
-		SAFE_RELEASE(resource->stagingBuffer);
-		if (resource->cpuBuffer != NULL)
-			delete[] resource->cpuBuffer;
+		if (resource != NULL)
+		{
+			SAFE_RELEASE(resource->stagingBuffer);
+			if (resource->cpuBuffer != NULL)
+				delete[] resource->cpuBuffer;
 
-		SAFE_DELETE(resource);
+			SAFE_DELETE(resource);
+		}
 	}
 
 	_resourceMap.clear();
+}
+
+//-------------------------------------------------------------------------------------------------
+// RendererAPI_D3D11::RequestTextureData_MainThread()
+//-------------------------------------------------------------------------------------------------
+void RendererAPI_D3D11::ReleaseTempResources(void* resourceHandle)
+{
+	ID3D11Resource* resource = (ID3D11Resource*)resourceHandle;
+	CpuResource* cpuResource = _resourceMap[resource];
+
+	if (cpuResource == NULL)
+		return;
+
+	// temp buffers are currently in use
+	//if (cpuResource->bufferStatus != CpuResourceStatus::Ready)
+		//return;
+
+	SAFE_RELEASE(cpuResource->stagingBuffer);
+	if (cpuResource->cpuBuffer != NULL)
+		delete[] cpuResource->cpuBuffer;
+
+	SAFE_DELETE(cpuResource);
+
+	_resourceMap[resource] = NULL;
 }
 
 //-------------------------------------------------------------------------------------------------

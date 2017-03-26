@@ -79,6 +79,8 @@ public:
 	virtual void CopyBufferData_RenderThread(void* textureHandle);
 	virtual Status RetrieveBufferData_MainThread(void* bufferHandle, void* data, int dataSize);
 
+	virtual void ReleaseTempResources(void* resourceHandle);
+
 private:
 	void ReleaseResources();
 	Status CreateStagingTexture(ID3D11Texture2D* gpuTexture, CpuResource* cpuResource);

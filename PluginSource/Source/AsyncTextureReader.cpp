@@ -164,6 +164,60 @@ extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetReq
 }
 
 //-------------------------------------------------------------------------------------------------
+// OnReleaseTempResourcesEvent
+//-------------------------------------------------------------------------------------------------
+static void UNITY_INTERFACE_API OnReleaseTempResourcesEvent(int eventID)
+{
+	if (sCurrentAPI != NULL && eventID >= 0 && eventID < sResourcesSize && sResources[eventID] != NULL)
+	{
+		sCurrentAPI->ReleaseTempResources(sResources[eventID]);
+		// free resource slot for future use
+		sResources[eventID] = NULL;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// GetReleaseTempResourcesEventFunc
+//-------------------------------------------------------------------------------------------------
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetReleaseTempResourcesEventFunc()
+{
+	return OnReleaseTempResourcesEvent;
+}
+
+//-------------------------------------------------------------------------------------------------
+// ReleaseTempResources
+//-------------------------------------------------------------------------------------------------
+extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ReleaseTempResources(void* resourceHandle)
+{
+	if (resourceHandle == NULL)
+	{
+		sLastStatus = Status::Error_InvalidArguments;
+		return -1;
+	}
+
+	// store resource handle
+	int resourceSlot = FindFreeResourceSlot();
+	if (resourceSlot == -1)
+	{
+		sLastStatus = Status::Error_TooManyRequests;
+		return -1;
+	}
+
+	sResources[resourceSlot] = resourceHandle;
+
+	if (sCurrentAPI != NULL)
+	{
+		sLastStatus = Status::Succeeded;
+		return resourceSlot;
+	}
+	else
+	{
+		sLastStatus = Status::Error_UnsupportedAPI;
+		return -1;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 // RequestTextureData
 //-------------------------------------------------------------------------------------------------
 extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RequestTextureData(void* textureHandle)

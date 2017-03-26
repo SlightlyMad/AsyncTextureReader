@@ -8,11 +8,18 @@ As a native plugin it has the ability to take down Unity if something goes wrong
 - At least Unity 5.2 is required (tested on 5.4). Compute buffers require Unity 5.5.
 - DirectX 11 only at the moment
 
+#Known Issues
+- Doesn't work with 3D textures
+- Doesn't work with cube textures
+- Doesn't work with texture arrays
+- Only first mip-level of texture can be retrieved.
+
 #Getting Started
 1. Copy Assets/* to your project
 2. In your script, create array big enough to hold your texture: `float[] data = new float[texture.width * texture.height];`
 3. Request texture data: `AsyncTextureReader.RequestTextureData(texture);`
 4. Call `AsyncTextureReader.RetrieveTextureData(texture, data)` every frame until it returns `AsyncTextureReader.Status.Succeeded`. Little hint. You can call RetrieveTextureData multiple times during a frame to get the data as soon as possible. For example in Update, PreRender and PostRender.
+5. (Optionally) Release temporary buffers: `AsyncTextureReader.ReleaseTempResources(texture)`. Release temp resources if you don't plan to retrieve data from given texture/buffer anymore. All resources will be otherwise released when plugin is unloaded.
 
 See Test scene for a simple example. Use only from main thread, it isn't thread-safe.
 
