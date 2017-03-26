@@ -1,20 +1,20 @@
-#Introduction 
+# Introduction 
 Native Unity plugin that lets you asynchronously copy textures and buffers from gpu memory to managed system memory.
 
-#Warning
+# Warning
 As a native plugin it has the ability to take down Unity if something goes wrong. Use at your own RISK. Save your work often.
 
-#Requirements
+# Requirements
 - At least Unity 5.2 is required (tested on 5.4). Compute buffers require Unity 5.5.
 - DirectX 11 only at the moment
 
-#Known Issues
+# Known Issues
 - Doesn't work with 3D textures
 - Doesn't work with cube textures
 - Doesn't work with texture arrays
 - Only first mip-level of texture can be retrieved.
 
-#Getting Started
+# Getting Started
 1. Copy Assets/* to your project
 2. In your script, create array big enough to hold your texture: `float[] data = new float[texture.width * texture.height];`
 3. Request texture data: `AsyncTextureReader.RequestTextureData(texture);`
@@ -23,13 +23,13 @@ As a native plugin it has the ability to take down Unity if something goes wrong
 
 See Test scene for a simple example. Use only from main thread, it isn't thread-safe.
 
-#How it works (high-level overview)
+# How it works (high-level overview)
 1. User requests texture/buffer data.
 2. Plugin creates new identical texture/buffer in system memory (with USAGE_STAGING flag). One time operation. It is kept for future use.
 3. Texture/buffer is asynchronously copied to system memory (ID3D11DeviceContext::CopyResource)
 4. User tries to retrieve texture/buffer data every frame until it succeeds. (ID3D11DeviceContext::Map with D3D11_MAP_FLAG_DO_NOT_WAIT flag - data is copied from texture/buffer in system memory into managed array supplied by the user)
 
-#How it really works
+# How it really works
 The process is bit more complicated because there are two threads involved.
 - Main thread: executes C# scripts, can't manipulate gpu objects
 - Render thread: Manipulates gpu objects
@@ -43,14 +43,14 @@ The process is bit more complicated because there are two threads involved.
 
 This should explain why calling AsyncTextureReader.RetrieveTextureData multiple times throughout a frame can speed things up.
 
-#Build plugin
+# Build plugin
 - Project files are located in AsyncTextureReader/PluginSource/Projects
 - Copy dll to Assets/Plugins folder
 
-#Unity Forum
+# Unity Forum
 You can discuss it [here](https://forum.unity3d.com/threads/asynchronously-getting-data-from-the-gpu-directx-11-with-rendertexture-or-computebuffer.281346/)
 
-#Native plugin implementation details
+# Native plugin implementation details
 ## Code organization
 - `AsyncTextureReader.cpp` - main plugin file. Unity callbacks are defined here.
 - `PlatformBase.h` - definition of platform specific macros
