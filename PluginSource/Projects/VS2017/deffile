@@ -1,0 +1,17 @@
+LIBRARY
+
+EXPORTS
+   UnityPluginLoad
+   UnityPluginUnload
+   GetRequestTextureEventFunc
+   GetRequestBufferEventFunc
+   GetReleaseTempResourcesEventFunc
+   ReleaseTempResources
+   RequestTextureData
+   GetCopyTextureEventFunc
+   RetrieveTextureData
+   RequestBufferData
+   GetCopyBufferEventFunc
+   RetrieveBufferData
+   GetLastStatus
+   SetDebugFunction
